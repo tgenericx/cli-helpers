@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+REPO="tgenericx/cli-helpers"
+BRANCH="main"
+BASE_URL="https://raw.githubusercontent.com/$REPO/refs/heads/$BRANCH"
+
+# Read utils from file
+mapfile -t utils < <(grep -vE '^\s*#|^\s*$' utils.txt)
+
+root_cmd() {
+  if [[ "$EUID" -eq 0 || "$PREFIX" == *"com.termux"* || "$(uname -o 2>/dev/null)" == "Android" ]]; then
+    echo ""
+  else
+    echo "sudo"
+  fi
+}
+
+install_script() {
+  local script="$1"
+  local prefix
+  prefix=$(root_cmd)
+
+  echo "📦 Installing: $script"
+
+  curl -fsSL "$BASE_URL/$script" -o "/tmp/$script"
+  chmod +x "/tmp/$script"
+  $prefix mv "/tmp/$script" /usr/local/bin/"$script"
+
+  echo "✅ Installed '$script' to /usr/local/bin"
+}
+
+install_all() {
+  for script in "${utils[@]}"; do
+    install_script "$script"
+  done
+}
+
+if [[ "${1:-}" == "--all" ]]; then
+  echo "🛠️  Installing all CLI helpers..."
+  install_all
+  exit 0
+fi
+
+echo "🛠️  CLI Helpers Installer"
+echo "Available scripts:"
+for i in "${!utils[@]}"; do
+  printf "  [%d] %s\n" $((i + 1)) "${utils[$i]}"
+done
+printf "  [%d] Install all\n" $((${#utils[@]} + 1))
+
+read -p "Select a script to install [1-$((${#utils[@]} + 1))]: " choice
+
+if ! [[ "$choice" =~ ^[0-9]+$ ]]; then
+  echo "❌ Invalid input. Expected a number."
+  exit 1
+fi
+
+if ((choice == ${#utils[@]} + 1)); then
+  install_all
+elif ((choice >= 1 && choice <= ${#utils[@]})); then
+  selected="${utils[$((choice - 1))]}"
+  install_script "$selected"
+else
+  echo "❌ Invalid selection."
+  exit 1
+fi

@@ -6,7 +6,21 @@ A collection of simple, effective command-line utilities and scripts I use to au
 
 ---
 
-## 📜 Available Scripts
+## ⚡ Quick Install
+
+> 📦 Interactive installer (lets you choose a script):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tgenericx/cli-helpers/main/install | bash
+````
+
+> 🧪 Install **all available** tools at once:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tgenericx/cli-helpers/main/install | bash -s -- --all
+```
+
+> 🧼 Automatically handles `sudo` or not (Termux-friendly)
 
 ### `tag-undo`
 
@@ -14,14 +28,17 @@ A collection of simple, effective command-line utilities and scripts I use to au
 
 ```bash
 tag-undo
-````
+```
 
 #### 🔧 Features:
 
-* Checks for Git repo
-* Prompts before deleting
-* Works with local + remote tags
-* Safe by default
+- Detects if you're in a Git repo
+    
+- Prompts before deleting
+    
+- Removes tag locally and from remote
+    
+- Safe, interactive by default
 
 #### 💡 Example usage:
 
@@ -41,37 +58,42 @@ Are you sure you want to delete this tag locally and remotely? (y/N): y
 ```
 cli-helpers/
 ├── tag-undo         # Bash script to undo latest Git tag
+├── utils.txt        # List of scripts used by the installer
+├── install          # Universal install script (curl-compatible)
 └── README.md
-```
-
----
-
-## 🛠️ Setup
-
-1. Clone the repo:
-
-```bash
-git clone https://github.com/tgenericx/cli-helpers.git
-```
-
-2. Add scripts to your `$PATH` (optional):
-
-```bash
-chmod +x ./cli-helpers/*
-sudo ln -s $(pwd)/cli-helpers/tag-undo /usr/local/bin/tag-undo
-```
-
-3. Use anywhere:
-
-```bash
-tag-undo
 ```
 
 ---
 
 ## 🧠 Philosophy
 
-Tiny tools. Zero dependencies. Unix-style. Make the terminal work *for* you.
+- Tiny tools with zero dependencies
+    
+- Simple Bash + POSIX style
+    
+- Cross-platform friendly (Termux, Linux, WSL, macOS)
+    
+- Designed to _just work_
+    
+
+---
+
+## 🛠 Manual Setup (if you don’t want to use the installer)
+
+```bash
+git clone https://github.com/tgenericx/cli-helpers.git
+cd cli-helpers
+chmod +x tag-undo
+sudo mv tag-undo /usr/local/bin/tag-undo  # Optional: skip sudo if root or on Termux
+```
+
+---
+
+## 🧼 Uninstall
+
+```bash
+sudo rm /usr/local/bin/tag-undo
+```
 
 ---
 

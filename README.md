@@ -22,12 +22,6 @@ curl -fsSL https://raw.githubusercontent.com/tgenericx/cli-helpers/main/install 
 
 > 🧼 Automatically handles `sudo` or not (Termux-friendly)
 
----
-
-## 📜 Available Scripts
-
-Scripts listed in [`utils.txt`](https://chatgpt.com/c/utils.txt):
-
 ### `tag-undo`
 
 🗑️ Undo (delete) the most recent Git tag — both locally and remotely.
@@ -45,7 +39,6 @@ tag-undo
 - Removes tag locally and from remote
     
 - Safe, interactive by default
-    
 
 #### 💡 Example usage:
 

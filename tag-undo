@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+undo_latest_tag() {
+  if ! git rev-parse --git-dir &>/dev/null; then
+    echo "❌ Not inside a Git repository."
+    exit 1
+  fi
+
+  local tag
+  tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+
+  if [[ -z "$tag" ]]; then
+    echo "⚠️  No tags found in this repository."
+    exit 1
+  fi
+
+  echo "🗑️  Tag to delete: $tag"
+  read -p "Are you sure you want to delete this tag locally and remotely? (y/N): " confirm
+
+  case "$confirm" in
+  [yY][eE][sS] | [yY])
+    git tag -d "$tag"
+    git push origin ":refs/tags/$tag"
+    echo "✅ Deleted tag '$tag' locally and remotely."
+    ;;
+  *)
+    echo "❌ Aborted. Tag '$tag' was not deleted."
+    ;;
+  esac
+}
+
+undo_latest_tag

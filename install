@@ -5,12 +5,16 @@ set -euo pipefail
 REPO="tgenericx/cli-helpers"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/$REPO/refs/heads/$BRANCH"
+UTILS_FILE="utils.txt"
 
-# Read utils from file
-mapfile -t utils < <(grep -vE '^\s*#|^\s*$' utils.txt)
+# Always fetch utils list from GitHub
+mapfile -t utils < <(curl -fsSL "$BASE_URL/$UTILS_FILE" | grep -vE '^\s*#|^\s*$') || {
+  echo "❌ Failed to fetch $UTILS_FILE"
+  exit 1
+}
 
 root_cmd() {
-  if [[ "$EUID" -eq 0 || "$PREFIX" == *"com.termux"* || "$(uname -o 2>/dev/null)" == "Android" ]]; then
+  if [[ "$EUID" -eq 0 || "${PREFIX:-}" == *"com.termux"* || "$(uname -o 2>/dev/null)" == "Android" ]]; then
     echo ""
   else
     echo "sudo"

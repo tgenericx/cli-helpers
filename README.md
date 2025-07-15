@@ -11,7 +11,7 @@ A collection of simple, effective command-line utilities and scripts I use to au
 > 📦 Interactive installer (lets you choose a script):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tgenericx/cli-helpers/main/install | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tgenericx/cli-helpers/main/install)
 ````
 
 > 🧪 Install **all available** tools at once:

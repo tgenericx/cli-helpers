@@ -117,9 +117,9 @@ gu() {
   # Stash handling
   # -----------------------------
   stashed=false
-  if [ "$no_stash" = false ] && ! git diff-index --quiet HEAD -- 2>/dev/null; then
-    echo "💾 Stashing uncommitted changes..."
-    git stash push -m "gu: auto-stash $(date '+%Y-%m-%d %H:%M:%S')" || return 1
+  if [ "$no_stash" = false ] && [ -n "$(git status --porcelain)" ]; then
+    echo "💾 Stashing uncommitted changes (including untracked files)..."
+    git stash push --include-untracked -m "gu: auto-stash $(date '+%Y-%m-%d %H:%M:%S')" || return 1
     stashed=true
   fi
 

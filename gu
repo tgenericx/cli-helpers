@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+
+gu() {
+  set -o pipefail
+
+  # -----------------------------
+  # Argument parsing
+  # -----------------------------
+  manual_target=""
+  no_stash=false
+  use_merge=false
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    --no-stash) no_stash=true ;;
+    --merge) use_merge=true ;;
+    -*)
+      echo "❌ Unknown option: $1"
+      echo "Usage: gu [branch] [--merge] [--no-stash]"
+      return 1
+      ;;
+    *)
+      if [ -n "$manual_target" ]; then
+        echo "❌ Multiple branch names provided"
+        return 1
+      fi
+      manual_target="$1"
+      ;;
+    esac
+    shift
+  done
+
+  # -----------------------------
+  # Ensure git context
+  # -----------------------------
+  current_branch=$(git branch --show-current 2>/dev/null)
+  if [ -z "$current_branch" ]; then
+    echo "❌ Not in a git repository or detached HEAD"
+    return 1
+  fi
+
+  echo "📌 Current branch: $current_branch"
+
+  # -----------------------------
+  # Cleanup helper - ALWAYS return to original branch
+  # -----------------------------
+  ensure_original_branch() {
+    local current=$(git branch --show-current 2>/dev/null)
+    if [ "$current" != "$current_branch" ]; then
+      echo "🔄 Returning to original branch: $current_branch..."
+      git switch "$current_branch" 2>/dev/null || {
+        echo "❌ Failed to return to $current_branch"
+        echo "   You are currently on: $current"
+      }
+    fi
+  }
+
+  # -----------------------------
+  # Determine target branch + remote
+  # -----------------------------
+  if [ -n "$manual_target" ]; then
+    target_branch="$manual_target"
+    remote="origin"
+    echo "📌 Target branch: $target_branch (manually specified)"
+  else
+    upstream_full=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)
+
+    if [ -n "$upstream_full" ]; then
+      remote=${upstream_full%%/*}
+      target_branch=${upstream_full#*/}
+      echo "📌 Target branch: $target_branch (from upstream: $remote)"
+    else
+      remote="origin"
+      target_branch=$(git symbolic-ref refs/remotes/$remote/HEAD 2>/dev/null | sed "s@^refs/remotes/$remote/@@")
+
+      if [ -z "$target_branch" ]; then
+        target_branch=$(git remote show "$remote" 2>/dev/null | grep 'HEAD branch' | awk '{print $NF}')
+      fi
+
+      if [ -z "$target_branch" ]; then
+        echo "❌ No upstream branch set and could not determine default branch"
+        echo "💡 Options:"
+        echo "   1. Set upstream: git branch --set-upstream-to=<remote>/<branch>"
+        echo "   2. Specify target: gu <branch>"
+        return 1
+      fi
+
+      echo "📌 Target branch: $target_branch (repository default)"
+      echo "💡 Tip: Set upstream with: git branch --set-upstream-to=$remote/$target_branch"
+    fi
+  fi
+
+  # -----------------------------
+  # Verify target branch exists
+  # -----------------------------
+  if ! git show-ref --verify --quiet "refs/heads/$target_branch" &&
+    ! git show-ref --verify --quiet "refs/remotes/$remote/$target_branch"; then
+    echo "❌ Target branch '$target_branch' does not exist"
+    return 1
+  fi
+
+  # -----------------------------
+  # If already on target branch
+  # -----------------------------
+  if [ "$current_branch" = "$target_branch" ]; then
+    echo "🌿 On target branch, updating..."
+    git fetch "$remote" || return 1
+    if [ "$use_merge" = true ]; then
+      git merge "$remote/$target_branch"
+    else
+      git rebase "$remote/$target_branch"
+    fi
+    return $?
+  fi
+
+  # -----------------------------
+  # Stash handling
+  # -----------------------------
+  stashed=false
+  if [ "$no_stash" = false ] && ! git diff-index --quiet HEAD -- 2>/dev/null; then
+    echo "💾 Stashing uncommitted changes..."
+    git stash push -m "gu: auto-stash $(date '+%Y-%m-%d %H:%M:%S')" || return 1
+    stashed=true
+  fi
+
+  # -----------------------------
+  # Update target branch
+  # -----------------------------
+  echo "🔄 Switching to $target_branch..."
+  if ! git switch "$target_branch"; then
+    echo "❌ Failed to switch to $target_branch"
+    [ "$stashed" = true ] && git stash pop 2>/dev/null
+    return 1
+  fi
+
+  echo "📥 Fetching latest from $remote..."
+  if ! git fetch "$remote"; then
+    ensure_original_branch
+    [ "$stashed" = true ] && git stash pop 2>/dev/null
+    return 1
+  fi
+
+  echo "🔄 Updating $target_branch..."
+  if [ "$use_merge" = true ]; then
+    if ! git merge "$remote/$target_branch"; then
+      echo "❌ Failed to merge $remote/$target_branch"
+      ensure_original_branch
+      [ "$stashed" = true ] && git stash pop 2>/dev/null
+      return 1
+    fi
+  else
+    if ! git rebase "$remote/$target_branch"; then
+      echo "❌ Failed to rebase onto $remote/$target_branch"
+      git rebase --abort 2>/dev/null
+      ensure_original_branch
+      [ "$stashed" = true ] && git stash pop 2>/dev/null
+      return 1
+    fi
+  fi
+
+  # -----------------------------
+  # Return to feature branch
+  # -----------------------------
+  echo "🔄 Returning to $current_branch..."
+  if ! git switch "$current_branch"; then
+    echo "❌ Failed to return to $current_branch"
+    [ "$stashed" = true ] && git stash pop 2>/dev/null
+    return 1
+  fi
+
+  # -----------------------------
+  # Rebase / merge feature branch
+  # -----------------------------
+  echo "♻️ Updating feature branch from $target_branch..."
+  if [ "$use_merge" = true ]; then
+    if ! git merge "$target_branch"; then
+      echo "⚠️  Merge conflict. Resolve manually, then:"
+      echo "   Complete: git merge --continue"
+      echo "   Abort:    git merge --abort"
+      [ "$stashed" = true ] && echo "💾 Stashed changes preserved. Apply after resolving: git stash pop"
+      return 1
+    fi
+  else
+    if ! git rebase "$target_branch"; then
+      echo "⚠️  Rebase conflict. Resolve manually, then:"
+      echo "   Continue: git rebase --continue"
+      echo "   Abort:    git rebase --abort"
+      [ "$stashed" = true ] && echo "💾 Stashed changes preserved. Apply after resolving: git stash pop"
+      return 1
+    fi
+  fi
+
+  # -----------------------------
+  # Restore stash (best-effort)
+  # -----------------------------
+  if [ "$stashed" = true ]; then
+    echo "📤 Applying stashed changes..."
+    if ! git stash pop; then
+      echo "⚠️  Stash could not be applied cleanly."
+      echo "   Resolve conflicts, then check: git stash list"
+      return 1
+    fi
+  fi
+
+  echo "✅ Update complete!"
+}
+
+gu "$@"
